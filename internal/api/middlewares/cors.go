@@ -3,7 +3,6 @@ package middlewares
 import (
 	"fmt"
 	"net/http"
-	"slices"
 )
 
 var allowedOrigins = []string{
@@ -18,6 +17,7 @@ func Cors(next http.Handler) http.Handler {
 		fmt.Println("Cors Header being returned")
 		origin := r.Header.Get("Origin")
 
+		fmt.Printf("Origin received from browser: %q\n", origin)
 		if isOriginAllowed(origin) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 		} else {
@@ -41,5 +41,11 @@ func Cors(next http.Handler) http.Handler {
 }
 
 func isOriginAllowed(origin string) bool {
-	return slices.Contains(allowedOrigins, origin)
+	fmt.Println("The current origin is: ", origin)
+	for _, allowedOrigin := range allowedOrigins {
+		if origin == allowedOrigin {
+			return true
+		}
+	}
+	return false
 }

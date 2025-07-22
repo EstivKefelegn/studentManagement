@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"student_management_api/Golang/internal/api/middlewares"
+	mw "student_management_api/Golang/internal/api/middlewares"
 )
 
 type User struct {
@@ -92,21 +92,18 @@ func excecsHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 
-
-	
 	cert := "cert.pem"
 	key := "key.pem"
 
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", rootHandler)
-	
+
 	mux.HandleFunc("/students/", studentsHandler)
-	
+
 	mux.HandleFunc("/teachers/", teachersHandler)
-	
-	mux.HandleFunc("/exec/", excecsHandler)
-	
+
+	mux.HandleFunc("/execs/", excecsHandler)
 
 	port := ":3000"
 
@@ -115,12 +112,10 @@ func main() {
 	}
 
 	server := &http.Server{
-		Addr: port,
-		Handler: middlewares.SecurityHeader(mux) ,
+		Addr:      port,
+		Handler:   mw.ResponseTimeMiddleware(mw.SecurityHeader(mw.Cors(mux))),
 		TLSConfig: tlsConfig,
 	}
-
-
 
 	fmt.Println("Server running on port :3000")
 	err := server.ListenAndServeTLS(cert, key)
