@@ -37,7 +37,7 @@ func Cors(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 		fmt.Println("CORS Middleware ends...")
-	})
+	}) 
 }
 
 func isOriginAllowed(origin string) bool {
