@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	mw "student_management_api/Golang/internal/api/middlewares"
+	"time"
 )
 
 type User struct {
@@ -99,7 +100,7 @@ func main() {
 
 	mux.HandleFunc("/", rootHandler)
 
-	mux.HandleFunc("/students/", studentsHandler)
+	mux.HandleFunc("/students", studentsHandler)
 
 	mux.HandleFunc("/teachers/", teachersHandler)
 
@@ -110,16 +111,19 @@ func main() {
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
+	rl := mw.NewRateLimiter(5, time.Minute)
 
+	fmt.Println("Server is going to start")
 	server := &http.Server{
 		Addr:      port,
-		Handler:   mw.Compression(mw.ResponseTimeMiddleware(mw.SecurityHeader(mw.Cors(mux)))),
+		Handler:   rl.Middleware(mw.Compression(mw.ResponseTimeMiddleware(mw.SecurityHeader(mw.Cors(mux))))),
 		TLSConfig: tlsConfig,
 	}
 
 	fmt.Println("Server running on port :3000")
 	err := server.ListenAndServeTLS(cert, key)
 	if err != nil {
+		log.Println("TLS server failed: ", err)
 		log.Fatal(err)
 	}
 
