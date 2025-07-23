@@ -9,7 +9,6 @@ var allowedOrigins = []string{
 	"https://my-origin-url.com",
 	"https://www.myfrontend.com",
 	"https://localhost:3000",
-	
 }
 
 func Cors(next http.Handler) http.Handler {

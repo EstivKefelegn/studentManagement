@@ -80,6 +80,17 @@ func excecsHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Hello get request from excecs  page"))
 		fmt.Println("hello get request from excecs  page")
 	case http.MethodPost:
+
+		fmt.Println("Query: ",r.URL.Query())
+		fmt.Println("Name: ", r.URL.Query().Get("name"))
+		fmt.Println("Name: ", r.URL.Query().Get("name"))
+
+		err := r.ParseForm()
+		if err != nil {
+			fmt.Printf("Something went wrong %v", err)
+			return
+		}
+		fmt.Println("Form from POST methods =========> ", r.Form)
 		w.Write([]byte("Hello post request from excecs  page"))
 		fmt.Println("Hello post request from excecs  page")
 	case http.MethodPut:
@@ -106,17 +117,24 @@ func main() {
 
 	mux.HandleFunc("/execs/", excecsHandler)
 
-	port := ":3000"
+	port := ":3000"  
 
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
 	rl := mw.NewRateLimiter(5, time.Minute)
+	hppOptions := mw.HPPOptions{
+		CheckQuery: true,
+		CheckBody: true,
+		CheckBodyOnlyForContentType: "applicaiotn/x-www-form-urlencoded",
+		Whitelist: []string{"sortBy", "sortOrder", "name", "age", "class"},
+	}
 
+	secureMux := mw.Hpp(hppOptions)(rl.Middleware(mw.Compression(mw.ResponseTimeMiddleware(mw.SecurityHeader(mw.Cors(mux))))))
 	fmt.Println("Server is going to start")
 	server := &http.Server{
 		Addr:      port,
-		Handler:   rl.Middleware(mw.Compression(mw.ResponseTimeMiddleware(mw.SecurityHeader(mw.Cors(mux))))),
+		Handler:   secureMux,
 		TLSConfig: tlsConfig,
 	}
 
