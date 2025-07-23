@@ -18,14 +18,12 @@ type User struct {
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Hello root route"))
-	fmt.Println("Hello root route")
 }
 
 func teachersHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		w.Write([]byte("Hello get request from teachers page"))
-		fmt.Println("hello get request from teachers page")
 	case http.MethodPost:
 
 		// Query Params /?key=value&sortby=email&sortorder=ASC
@@ -42,10 +40,7 @@ func teachersHandler(w http.ResponseWriter, r *http.Request) {
 			sortOrder = "DESC"
 		}
 
-		fmt.Println("Get the sort by value: ", sortOrder)
-		fmt.Println("Query parmater is: ", queryParam)
 		w.Write([]byte("Hello post request from teachers page"))
-		fmt.Println("Hello post request from teachers page")
 	case http.MethodPut:
 		w.Write([]byte("Hello put request from teachers page"))
 		fmt.Println("Hello put request from teachers page")
@@ -81,9 +76,9 @@ func excecsHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("hello get request from excecs  page")
 	case http.MethodPost:
 
-		fmt.Println("Query: ",r.URL.Query())
-		fmt.Println("Name: ", r.URL.Query().Get("name"))
-		fmt.Println("Name: ", r.URL.Query().Get("name"))
+		// fmt.Println("Query: ", r.URL.Query())
+		// fmt.Println("Name: ", r.URL.Query().Get("name"))
+		// fmt.Println("Name: ", r.URL.Query().Get("name"))
 
 		err := r.ParseForm()
 		if err != nil {
@@ -117,20 +112,21 @@ func main() {
 
 	mux.HandleFunc("/execs/", excecsHandler)
 
-	port := ":3000"  
+	port := ":3000"
 
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
 	rl := mw.NewRateLimiter(5, time.Minute)
 	hppOptions := mw.HPPOptions{
-		CheckQuery: true,
-		CheckBody: true,
+		CheckQuery:                  true,
+		CheckBody:                   true,
 		CheckBodyOnlyForContentType: "applicaiotn/x-www-form-urlencoded",
-		Whitelist: []string{"sortBy", "sortOrder", "name", "age", "class"},
+		Whitelist:                   []string{"sortBy", "sortOrder", "name", "age", "class"},
 	}
 
-	secureMux := mw.Hpp(hppOptions)(rl.Middleware(mw.Compression(mw.ResponseTimeMiddleware(mw.SecurityHeader(mw.Cors(mux))))))
+	// secureMux := mw.Hpp(hppOptions)(rl.Middleware(mw.Compression(mw.ResponseTimeMiddleware(mw.SecurityHeader(mw.Cors(mux))))))
+	secureMux := ApplyingMiddleware(mux, mw.Hpp(hppOptions), mw.Compression, mw.SecurityHeader, mw.ResponseTimeMiddleware, rl.Middleware, mw.Cors)
 	fmt.Println("Server is going to start")
 	server := &http.Server{
 		Addr:      port,
@@ -145,4 +141,13 @@ func main() {
 		log.Fatal(err)
 	}
 
+}
+
+type middleware func(http.Handler) http.Handler
+
+func ApplyingMiddleware(handler http.Handler, middlewares ...middleware) http.Handler {
+	for _, middleware := range middlewares {
+		handler = middleware(handler)
+	}
+	return handler
 }

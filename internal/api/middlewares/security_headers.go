@@ -6,6 +6,7 @@ import (
 )
 
 func SecurityHeader(next http.Handler) http.Handler {
+	fmt.Println("Security Headers middleware")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("SecurityHeaders Middleware being returned")
 
