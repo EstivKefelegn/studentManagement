@@ -5,17 +5,32 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	mw "student_management_api/Golang/internal/api/middlewares"
 	"student_management_api/Golang/internal/api/router"
+	"student_management_api/Golang/internal/repository/sqlconnect"
 	_ "time"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
 
+	err := godotenv.Load()
+	if err != nil {
+		return
+	}
+	_, err = sqlconnect.ConnectDB()
+
+	if err != nil {
+		fmt.Println("Error------: ", err)
+		return
+	}
+
 	cert := "cert.pem"
 	key := "key.pem"
 
-	port := ":3000"
+	port := os.Getenv("API_PORT") 
 
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
@@ -38,7 +53,7 @@ func main() {
 	}
 
 	fmt.Println("Server running on port :3000")
-	err := server.ListenAndServeTLS(cert, key)
+	err = server.ListenAndServeTLS(cert, key)
 	if err != nil {
 		log.Println("TLS server failed: ", err)
 		log.Fatal(err)
