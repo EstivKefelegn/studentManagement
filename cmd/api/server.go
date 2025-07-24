@@ -5,128 +5,31 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 	mw "student_management_api/Golang/internal/api/middlewares"
-	"time"
+	"student_management_api/Golang/internal/api/router"
+	_ "time"
 )
-
-type User struct {
-	Name string `json:"name"`
-	Age  string `json:"age"`
-	City string `json:"city"`
-}
-
-func rootHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Hello root route"))
-}
-
-func teachersHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		w.Write([]byte("Hello get request from teachers page"))
-	case http.MethodPost:
-
-		// Query Params /?key=value&sortby=email&sortorder=ASC
-		fmt.Println(r.URL.Path)
-		path := r.URL.Path
-		newUser := strings.TrimPrefix(path, "/teachers/")
-		userId := strings.TrimSuffix(newUser, "/")
-		fmt.Println("Uers ID is: ", userId)
-
-		queryParam := r.URL.Query()
-		sortOrder := queryParam.Get("sortorder")
-
-		if sortOrder == "" {
-			sortOrder = "DESC"
-		}
-
-		w.Write([]byte("Hello post request from teachers page"))
-	case http.MethodPut:
-		w.Write([]byte("Hello put request from teachers page"))
-		fmt.Println("Hello put request from teachers page")
-	case http.MethodDelete:
-		w.Write([]byte("Hello delete request from teachers page"))
-		fmt.Println("Hello delete requets from teachers page")
-	}
-}
-
-func studentsHandler(w http.ResponseWriter, r *http.Request) {
-
-	switch r.Method {
-	case http.MethodGet:
-		w.Write([]byte("Hello get request from students page"))
-		fmt.Println("hello get request from students page")
-	case http.MethodPost:
-		w.Write([]byte("Hello post request from student page"))
-		fmt.Println("Hello post request from students page")
-	case http.MethodPut:
-		w.Write([]byte("Hello put request from student page"))
-		fmt.Println("Hello put request from students page")
-	case http.MethodDelete:
-		w.Write([]byte("Hello delete request from student page"))
-		fmt.Println("Hello delete requets from students page")
-	}
-
-}
-
-func excecsHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		w.Write([]byte("Hello get request from excecs  page"))
-		fmt.Println("hello get request from excecs  page")
-	case http.MethodPost:
-
-		// fmt.Println("Query: ", r.URL.Query())
-		// fmt.Println("Name: ", r.URL.Query().Get("name"))
-		// fmt.Println("Name: ", r.URL.Query().Get("name"))
-
-		err := r.ParseForm()
-		if err != nil {
-			fmt.Printf("Something went wrong %v", err)
-			return
-		}
-		fmt.Println("Form from POST methods =========> ", r.Form)
-		w.Write([]byte("Hello post request from excecs  page"))
-		fmt.Println("Hello post request from excecs  page")
-	case http.MethodPut:
-		w.Write([]byte("Hello put request from excecs  page"))
-		fmt.Println("Hello put request from excecs  page")
-	case http.MethodDelete:
-		w.Write([]byte("Hello delete request from excecs  page"))
-		fmt.Println("Hello delete requets from excecs  page")
-	}
-}
 
 func main() {
 
 	cert := "cert.pem"
 	key := "key.pem"
 
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("/", rootHandler)
-
-	mux.HandleFunc("/students", studentsHandler)
-
-	mux.HandleFunc("/teachers/", teachersHandler)
-
-	mux.HandleFunc("/execs/", excecsHandler)
-
 	port := ":3000"
 
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
-	rl := mw.NewRateLimiter(5, time.Minute)
-	hppOptions := mw.HPPOptions{
-		CheckQuery:                  true,
-		CheckBody:                   true,
-		CheckBodyOnlyForContentType: "applicaiotn/x-www-form-urlencoded",
-		Whitelist:                   []string{"sortBy", "sortOrder", "name", "age", "class"},
-	}
+	// rl := mw.NewRateLimiter(5, time.Minute)
+	// hppOptions := mw.HPPOptions{
+	// 	CheckQuery:                  true,
+	// 	CheckBody:                   true,
+	// 	CheckBodyOnlyForContentType: "applicaiotn/x-www-form-urlencoded",
+	// 	Whitelist:                   []string{"sortBy", "sortOrder", "name", "age", "class", "first_name", "last_name"},
+	// }
 
-	// secureMux := mw.Hpp(hppOptions)(rl.Middleware(mw.Compression(mw.ResponseTimeMiddleware(mw.SecurityHeader(mw.Cors(mux))))))
-	secureMux := ApplyingMiddleware(mux, mw.Hpp(hppOptions), mw.Compression, mw.SecurityHeader, mw.ResponseTimeMiddleware, rl.Middleware, mw.Cors)
+	// secureMux := utils.ApplyingMiddleware(router.Router(), mw.Hpp(hppOptions), mw.Compression, mw.SecurityHeader, mw.ResponseTimeMiddleware, rl.Middleware, mw.Cors)
+	secureMux := mw.SecurityHeader(router.Router())
 	fmt.Println("Server is going to start")
 	server := &http.Server{
 		Addr:      port,
@@ -141,13 +44,4 @@ func main() {
 		log.Fatal(err)
 	}
 
-}
-
-type middleware func(http.Handler) http.Handler
-
-func ApplyingMiddleware(handler http.Handler, middlewares ...middleware) http.Handler {
-	for _, middleware := range middlewares {
-		handler = middleware(handler)
-	}
-	return handler
 }
