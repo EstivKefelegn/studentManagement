@@ -28,7 +28,7 @@ func isValidSortField(field string) bool {
 
 	return validFields[field]
 }
-func getTeacherHndler(w http.ResponseWriter, r *http.Request) {
+func GetTeachersHndler(w http.ResponseWriter, r *http.Request) {
 
 	db, err := sqlconnect.ConnectDB()
 	if err != nil {
@@ -36,52 +36,56 @@ func getTeacherHndler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	path := strings.TrimPrefix(r.URL.Path, "/teachers/")
-	idStr := strings.TrimSuffix(path, "/")
-	fmt.Println(idStr)
+	query := `SELECT id, first_name, last_name, email, class, subject FROM teachers WHERE 1=1`
+	var args []interface{}
 
-	if idStr == "" {
+	query, args = addFilter(r, query, args)
 
-		query := `SELECT id, first_name, last_name, email, class, subject FROM teachers WHERE 1=1`
-		var args []interface{}
+	query = addSorting(r, query)
+	rows, err := db.Query(query, args...)
 
-		query, args = addFilter(r, query, args)
-
-		query = addSorting(r, query)
-		rows, err := db.Query(query, args...)
-
-		if err != nil {
-			fmt.Println(err)
-			http.Error(w, "Databse Query Error", http.StatusInternalServerError)
-			return
-		}
-		defer rows.Close()
-
-		teachersList := make([]models.Teacher, 0)
-
-		for rows.Next() {
-			var teacher models.Teacher
-			err = rows.Scan(&teacher.ID, &teacher.FirstName, &teacher.LastName, &teacher.Email, &teacher.Class, &teacher.Subject)
-			if err != nil {
-				http.Error(w, "Error scanning databse results", http.StatusInternalServerError)
-				return
-			}
-			teachersList = append(teachersList, teacher)
-			fmt.Println(teachersList)
-		}
-		response := struct {
-			Status string           `json:"status"`
-			Count  int              `json:"count"`
-			Data   []models.Teacher `json:"teachers"`
-		}{
-			Status: "success",
-			Count:  len(teachersList),
-			Data:   teachersList,
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Databse Query Error", http.StatusInternalServerError)
 		return
 	}
+	defer rows.Close()
+
+	teachersList := make([]models.Teacher, 0)
+
+	for rows.Next() {
+		var teacher models.Teacher
+		err = rows.Scan(&teacher.ID, &teacher.FirstName, &teacher.LastName, &teacher.Email, &teacher.Class, &teacher.Subject)
+		if err != nil {
+			http.Error(w, "Error scanning databse results", http.StatusInternalServerError)
+			return
+		}
+		teachersList = append(teachersList, teacher)
+		fmt.Println(teachersList)
+	}
+	response := struct {
+		Status string           `json:"status"`
+		Count  int              `json:"count"`
+		Data   []models.Teacher `json:"teachers"`
+	}{
+		Status: "success",
+		Count:  len(teachersList),
+		Data:   teachersList,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+
+}
+
+func GetTeacherHndler(w http.ResponseWriter, r *http.Request) {
+
+	db, err := sqlconnect.ConnectDB()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Couldn't connect to db: %v", err), http.StatusBadRequest)
+	}
+	defer db.Close()
+
+	idStr := r.PathValue("id")
 
 	id, err := strconv.Atoi(idStr)
 	fmt.Println("ID is going to display")
@@ -90,7 +94,6 @@ func getTeacherHndler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println("The ID is: ", id)
 
 	var teacher models.Teacher
 	err = db.QueryRow(`SELECT id, first_name, last_name, email, class, subject FROM teachers WHERE id = ?`, id).Scan(
@@ -152,7 +155,7 @@ func addFilter(r *http.Request, query string, args []interface{}) (string, []int
 	return query, args
 }
 
-func addTeachersHandler(w http.ResponseWriter, r *http.Request) {
+func AddTeachersHandler(w http.ResponseWriter, r *http.Request) {
 	db, err := sqlconnect.ConnectDB()
 
 	if err != nil {
@@ -212,7 +215,7 @@ func addTeachersHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // PUT func
-func updateTeacherHadler(w http.ResponseWriter, r *http.Request) {
+func UpdateTeacherHadler(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimPrefix(r.URL.Path, "/teachers/")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
@@ -266,7 +269,7 @@ func updateTeacherHadler(w http.ResponseWriter, r *http.Request) {
 
 // patch teachers
 
-func patchTeachersHandler(w http.ResponseWriter, r *http.Request) {
+func PatchOneTeachersHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimPrefix(r.URL.Path, "/teachers/")
 	id, err := strconv.Atoi(idStr)
 
@@ -347,7 +350,104 @@ func patchTeachersHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func deleteTeachersHandler(w http.ResponseWriter, r *http.Request) {
+func PatchTeachersHandler(w http.ResponseWriter, r *http.Request) {
+	db, err := sqlconnect.ConnectDB()
+	if err != nil {
+		http.Error(w, "Unable to connect to databse", http.StatusBadRequest)
+		return
+	}
+
+	defer db.Close()
+
+	var updates []map[string]interface{}
+	err = json.NewDecoder(r.Body).Decode(&updates)
+	if err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Error starting transactions", http.StatusInternalServerError)
+		return
+	}
+
+	for _, update := range updates {
+		idStr, ok := update["id"].(string)
+		if !ok {
+			tx.Rollback()
+			http.Error(w, "Invalid teacher ID in update", http.StatusBadRequest)
+			return
+		}
+
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			http.Error(w, "Could convert the id", http.StatusBadRequest)
+			return
+		}
+
+		var teacherFormDB models.Teacher
+		err = db.QueryRow("SELECT id, first_name, last_name, email, class, subject FROM teachers WHERE id = ?", id).Scan(&teacherFormDB.ID,
+			&teacherFormDB.FirstName, &teacherFormDB.LastName, &teacherFormDB.Email, &teacherFormDB.Class, &teacherFormDB.Subject)
+
+		if err != nil {
+			if err == sql.ErrNoRows {
+				tx.Rollback()
+				http.Error(w, "Teacher not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, "Error retriving teachers", http.StatusInternalServerError)
+			return
+		}
+
+		teachersVal := reflect.ValueOf(&teacherFormDB).Elem()
+		teacherType := teachersVal.Type()
+
+		fmt.Println("The Teachers value  is: ", teachersVal)
+		fmt.Println("The Type of the teacher is: ", teacherType)
+		fmt.Println("Teacher Number Of Fields: ", teachersVal.NumField())
+		// fmt.Println("Tacher field: ", teachersVal.Field())
+		for k, v := range update {
+			for i := 0; i < teachersVal.NumField(); i++ {
+				field := teacherType.Field(i)
+				if field.Tag.Get("json") == k+",omitempty" {
+					fieldVal := teachersVal.Field(i)
+					if fieldVal.CanSet() {
+						val := reflect.ValueOf(v)
+						if val.Type().ConvertibleTo(field.Type) {
+							fieldVal.Set(val.Convert(fieldVal.Type()))
+						} else {
+							tx.Rollback()
+							log.Printf("cannot convert %v to %v", val.Type(), fieldVal.Type())
+							return
+						}
+					}
+					break
+				}
+			}
+		}
+		_, err = tx.Exec("UPDATE teachers SET first_name = ?, last_name = ?, email = ?, class = ?, subject = ? WHERE id = ? ", teacherFormDB.FirstName,
+			teacherFormDB.LastName, teacherFormDB.Email, teacherFormDB.Class, teacherFormDB.Subject, teacherFormDB.ID)
+
+		if err != nil {
+			tx.Rollback()
+			http.Error(w, "Couldn't update the value", http.StatusInternalServerError)
+			return
+		}
+
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		http.Error(w, "Error commiting transaction", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func DeleteTeachersHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimPrefix(r.URL.Path, "/teachers/")
 	id, err := strconv.Atoi(idStr)
 
@@ -395,17 +495,17 @@ func TeachersHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		// w.Write([]byte("Hello get request from teachers page"))
-		getTeacherHndler(w, r)
+		GetTeacherHndler(w, r)
 	case http.MethodPost:
 		// w.Write([]byte("Hello post request from teachers page"))
-		addTeachersHandler(w, r)
+		AddTeachersHandler(w, r)
 	case http.MethodPut:
-		updateTeacherHadler(w, r)
+		UpdateTeacherHadler(w, r)
 		// w.Write([]byte("Hello put request from teachers page"))
 		// fmt.Println("Hello put request from teachers page")
 	case http.MethodPatch:
-		patchTeachersHandler(w, r)
+		PatchOneTeachersHandler(w, r)
 	case http.MethodDelete:
-		deleteTeachersHandler(w, r)
+		DeleteTeachersHandler(w, r)
 	}
 }
