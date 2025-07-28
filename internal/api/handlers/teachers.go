@@ -353,7 +353,8 @@ func PatchOneTeachersHandler(w http.ResponseWriter, r *http.Request) {
 func PatchTeachersHandler(w http.ResponseWriter, r *http.Request) {
 	db, err := sqlconnect.ConnectDB()
 	if err != nil {
-		http.Error(w, "Unable to connect to databse", http.StatusBadRequest)
+		log.Printf("Database connection error: %v", err)
+		http.Error(w, "Unable to connect to database", http.StatusInternalServerError)
 		return
 	}
 
@@ -404,15 +405,18 @@ func PatchTeachersHandler(w http.ResponseWriter, r *http.Request) {
 		teachersVal := reflect.ValueOf(&teacherFormDB).Elem()
 		teacherType := teachersVal.Type()
 
-		fmt.Println("The Teachers value  is: ", teachersVal)
-		fmt.Println("The Type of the teacher is: ", teacherType)
-		fmt.Println("Teacher Number Of Fields: ", teachersVal.NumField())
-		// fmt.Println("Tacher field: ", teachersVal.Field())
 		for k, v := range update {
+			if k == "id" {
+				continue 
+			}
 			for i := 0; i < teachersVal.NumField(); i++ {
 				field := teacherType.Field(i)
-				if field.Tag.Get("json") == k+",omitempty" {
+				// if field.Tag.Get("json") == k+",omitempty" {
+				// if field.Tag.Get("json") == k {
+				jsonTag := strings.Split(field.Tag.Get("json"), ",")[0]
+				if jsonTag == k {
 					fieldVal := teachersVal.Field(i)
+					fmt.Println("The field value is: ", fieldVal)
 					if fieldVal.CanSet() {
 						val := reflect.ValueOf(v)
 						if val.Type().ConvertibleTo(field.Type) {
@@ -427,7 +431,11 @@ func PatchTeachersHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		_, err = tx.Exec("UPDATE teachers SET first_name = ?, last_name = ?, email = ?, class = ?, subject = ? WHERE id = ? ", teacherFormDB.FirstName,
+		fmt.Printf("Updating ID %d: %s, %s, %s, %s, %s\n", teacherFormDB.ID,
+			teacherFormDB.FirstName, teacherFormDB.LastName,
+			teacherFormDB.Email, teacherFormDB.Class, teacherFormDB.Subject)
+
+		res, err := tx.Exec("UPDATE teachers SET first_name = ?, last_name = ?, email = ?, class = ?, subject = ? WHERE id = ? ", teacherFormDB.FirstName,
 			teacherFormDB.LastName, teacherFormDB.Email, teacherFormDB.Class, teacherFormDB.Subject, teacherFormDB.ID)
 
 		if err != nil {
@@ -435,6 +443,14 @@ func PatchTeachersHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Couldn't update the value", http.StatusInternalServerError)
 			return
 		}
+
+		affectedRows, err := res.RowsAffected()
+		if err != nil {
+			fmt.Println("There is no affectedRows")
+			return
+		}
+
+		fmt.Println(affectedRows, "Affected Rows")
 
 	}
 
