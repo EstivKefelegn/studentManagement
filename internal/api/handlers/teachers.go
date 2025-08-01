@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"reflect"
@@ -58,11 +59,51 @@ func GetTeacherHndler(w http.ResponseWriter, r *http.Request) {
 func AddTeachersHandler(w http.ResponseWriter, r *http.Request) {
 
 	var newTeachers []models.Teacher
-	err := json.NewDecoder(r.Body).Decode(&newTeachers)
+	var rawTeachers []map[string]interface{}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Error: reading request body", http.StatusBadRequest)
+		return
+	}
+
+	err = json.Unmarshal(body, &rawTeachers)
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	fmt.Println(rawTeachers)
+
+	fields := GetFieldNames(models.Teacher{})
+
+	allowedFields := make(map[string]struct{})
+	for _, field := range fields {
+		allowedFields[field] = struct{}{}
+	}
+
+	for _, teachers := range rawTeachers {
+		for key := range teachers {
+			_, ok := allowedFields[key]
+			if !ok {
+				http.Error(w, "Unacceptable field found in request. Only use allowed fields. ", http.StatusBadRequest)
+				return
+			}
+		}
+	}
+
+	err = json.Unmarshal(body, &newTeachers)
 
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid JSON format: %v", err), http.StatusBadRequest)
 		return
+	}
+
+	for _, teacher := range newTeachers {
+		err = CheckEmptyFields(teacher)
+		if err != nil {
+			return
+		}
 	}
 
 	addTeacers, err := sqlconnect.AddTeachersDBHandler(newTeachers)
@@ -85,7 +126,6 @@ func AddTeachersHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 
 }
-
 
 // PUT func
 func UpdateTeacherHadler(w http.ResponseWriter, r *http.Request) {

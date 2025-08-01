@@ -1,0 +1,33 @@
+package handlers
+
+import (
+	"errors"
+	"reflect"
+	"strings"
+	"student_management_api/Golang/internal/models"
+	"student_management_api/Golang/pkg/utils"
+)
+
+func CheckEmptyFields(teacher models.Teacher) error {
+	val := reflect.ValueOf(teacher)
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
+		if field.Kind() == reflect.String && field.String() == "" {
+			return utils.ErrorHandler(errors.New("all fields are required"), "all fields are required")
+
+		}
+	}
+	return nil
+}
+
+func GetFieldNames(model interface{}) []string {
+	val := reflect.TypeOf(model)
+	fields := []string{}
+
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
+		fieldToAdd := strings.TrimSuffix(field.Tag.Get("json"), ".omitepty")
+		fields = append(fields, fieldToAdd)
+	}
+	return fields
+}
