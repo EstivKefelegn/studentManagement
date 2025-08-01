@@ -46,7 +46,7 @@ func GetTeacherHndler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	teacher, err := sqlconnect.GetTeacherById(w, id)
+	teacher, err := sqlconnect.GetTeacherById(id)
 	if err != nil {
 		return
 	}
@@ -65,7 +65,7 @@ func AddTeachersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	addTeacers, err := sqlconnect.AddTeachersDBHandler(w, newTeachers)
+	addTeacers, err := sqlconnect.AddTeachersDBHandler(newTeachers)
 	if err != nil {
 		return
 	}
@@ -87,7 +87,6 @@ func AddTeachersHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 
-
 // PUT func
 func UpdateTeacherHadler(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
@@ -105,7 +104,7 @@ func UpdateTeacherHadler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updatedTeacherDB, err := sqlconnect.UpdateTeacherDBHandler(w, id, updatedTeacher)
+	updatedTeacherDB, err := sqlconnect.UpdateTeacherDBHandler(id, updatedTeacher)
 	if err != nil {
 		return
 	}
@@ -113,7 +112,6 @@ func UpdateTeacherHadler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(updatedTeacherDB)
 }
-
 
 // patch teachers
 
@@ -132,20 +130,13 @@ func PatchOneTeachersHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request payload", http.StatusInternalServerError)
 	}
 
-	db, err := sqlconnect.ConnectDB()
+	updatedTeacher, err := sqlconnect.PatchTeacherDBHandler(id, updates)
 	if err != nil {
-		http.Error(w, "Couldn't connect to thw database", http.StatusInternalServerError)
+		log.Println(err)
 		return
 	}
 
-	defer db.Close()
-
-	err = sqlconnect.PatchTeacherDBHandler(db, id, err, w, updates)
-	if err != nil {
-		return
-	}
-
-	json.NewEncoder(w).Encode(updates)
+	json.NewEncoder(w).Encode(updatedTeacher)
 
 }
 
@@ -271,24 +262,8 @@ func DeleteTeacherHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db, err := sqlconnect.ConnectDB()
+	affectedRow, err := sqlconnect.DeleteOneTeacher(w, id)
 	if err != nil {
-		http.Error(w, "Couldn't connect to db", http.StatusInternalServerError)
-		return
-	}
-
-	defer db.Close()
-
-	res, err := db.Exec(`DELETE FROM teachers WHERE id = ?`, id)
-
-	if err != nil {
-		http.Error(w, "No request data found", http.StatusNotFound)
-		return
-	}
-
-	affectedRow, err := res.RowsAffected()
-	if err != nil {
-		fmt.Println("No affected row is found")
 		return
 	}
 
@@ -307,82 +282,23 @@ func DeleteTeacherHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteTeachersHandler(w http.ResponseWriter, r *http.Request) {
-	db, err := sqlconnect.ConnectDB()
-	if err != nil {
-		http.Error(w, "Couldn't connect to db", http.StatusInternalServerError)
-		return
-	}
-
-	defer db.Close()
 	var ids []int
-	err = json.NewDecoder(r.Body).Decode(&ids)
+	err := json.NewDecoder(r.Body).Decode(&ids)
 	if err != nil {
 		log.Println("Invalid request")
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
-	tx, err := db.Begin()
+	deletedIDs, err := sqlconnect.DeleteTeachers(ids)
 	if err != nil {
-		log.Println("Invlid transaction")
-		http.Error(w, "Invalid transaction", http.StatusInternalServerError)
-		return
-	}
-
-	stmt, err := tx.Prepare("DELETE FROM teachers WHERE id = ?")
-	if err != nil {
-		log.Println(err)
-		http.Error(w, "Invalid transaction", http.StatusInternalServerError)
-		return
-	}
-
-	defer stmt.Close()
-
-	deletedIDs := []int{}
-
-	for _, id := range ids {
-		res, err := stmt.Exec(id)
-		if err != nil {
-			tx.Rollback()
-			log.Println("Invlid transaction")
-			http.Error(w, "Invalid transaction", http.StatusInternalServerError)
-			return
-		}
-
-		affectedRow, err := res.RowsAffected()
-		if err != nil {
-			log.Println("Invlid transaction")
-			http.Error(w, "Invalid transaction", http.StatusInternalServerError)
-			return
-		}
-
-		if affectedRow > 0 {
-			deletedIDs = append(deletedIDs, id)
-		}
-
-		if affectedRow < 1 {
-			tx.Rollback()
-			http.Error(w, fmt.Sprintf("ID %d doesn't exist", id), http.StatusInternalServerError)
-			return
-		}
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		log.Println("err")
-		http.Error(w, "Error commiting transaction", http.StatusInternalServerError)
-		return
-	}
-
-	if len(deletedIDs) < 1 {
-		http.Error(w, "IDs do not exists", http.StatusBadRequest)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	response := struct {
 		Status     string `json:"status"`
-		DeletedIDs []int  `json:"deleted_IDs`
+		DeletedIDs []int  `json:"deleted_IDs"`
 	}{
 		Status:     "Teachers successfully deleted",
 		DeletedIDs: deletedIDs,
@@ -395,15 +311,11 @@ func DeleteTeachersHandler(w http.ResponseWriter, r *http.Request) {
 func TeachersHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		// w.Write([]byte("Hello get request from teachers page"))
 		GetTeacherHndler(w, r)
 	case http.MethodPost:
-		// w.Write([]byte("Hello post request from teachers page"))
 		AddTeachersHandler(w, r)
 	case http.MethodPut:
 		UpdateTeacherHadler(w, r)
-		// w.Write([]byte("Hello put request from teachers page"))
-		// fmt.Println("Hello put request from teachers page")
 	case http.MethodPatch:
 		PatchOneTeachersHandler(w, r)
 	case http.MethodDelete:
