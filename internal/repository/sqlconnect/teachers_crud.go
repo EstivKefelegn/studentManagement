@@ -6,70 +6,9 @@ import (
 	"log"
 	"net/http"
 	"reflect"
-	"strings"
 	"student_management_api/Golang/internal/models"
 	"student_management_api/Golang/pkg/utils"
 )
-
-func addSorting(r *http.Request, query string) string {
-	sortParams := r.URL.Query()["sortby"]
-	if len(sortParams) > 0 { // if sortvalue exists
-		query += " ORDER BY"
-		for i, param := range sortParams {
-			// /?sortby=last_name:asc
-			parts := strings.Split(param, ":")
-			if len(parts) != 2 {
-				continue
-			}
-			field, order := parts[0], parts[1]
-			if !isValidSortField(field) || !isValidSortOrder(order) {
-				continue
-			}
-
-			if i > 0 {
-				query += ","
-			}
-			query += " " + field + " " + order
-		}
-	}
-	return query
-}
-
-func addFilter(r *http.Request, query string, args []interface{}) (string, []interface{}) {
-	params := map[string]string{
-		"first_name": "first_name",
-		"last_name":  "last_name",
-		"email":      "email",
-		"calss":      "class",
-		"subject":    "subject",
-	}
-
-	for param, dbField := range params {
-		value := r.URL.Query().Get(param)
-		if value != "" {
-			query += " AND " + dbField + " = ?"
-			args = append(args, value)
-		}
-	}
-
-	return query, args
-}
-
-func isValidSortOrder(order string) bool {
-	return order == "asc" || order == "desc"
-}
-
-func isValidSortField(field string) bool {
-	validFields := map[string]bool{
-		"first_name": true,
-		"last_name":  true,
-		"email":      true,
-		"calss":      true,
-		"subject":    true,
-	}
-
-	return validFields[field]
-}
 
 func GetTeachersDbHandler(teachers []models.Teacher, r *http.Request) ([]models.Teacher, error) {
 	db, err := ConnectDB()
@@ -83,9 +22,9 @@ func GetTeachersDbHandler(teachers []models.Teacher, r *http.Request) ([]models.
 	query := `SELECT id, first_name, last_name, email, class, subject FROM teachers WHERE 1=1`
 	var args []interface{}
 
-	query, args = addFilter(r, query, args)
+	query, args = utils.AddFilter(r, query, args)
 
-	query = addSorting(r, query)
+	query = utils.AddSorting(r, query)
 
 	rows, err := db.Query(query, args...)
 
@@ -102,7 +41,7 @@ func GetTeachersDbHandler(teachers []models.Teacher, r *http.Request) ([]models.
 		var teacher models.Teacher
 		err = rows.Scan(&teacher.ID, &teacher.FirstName, &teacher.LastName, &teacher.Email, &teacher.Class, &teacher.Subject)
 		if err != nil {
-			return nil, utils.ErrorHandler(err,"Error scanning databse results")
+			return nil, utils.ErrorHandler(err, "Error scanning databse results")
 		}
 		teachersList = append(teachersList, teacher)
 		fmt.Println(teachersList)
@@ -139,7 +78,7 @@ func AddTeachersDBHandler(newTeachers []models.Teacher) ([]models.Teacher, error
 	defer db.Close()
 
 	// stmt, err := db.Prepare(`INSERT INTO teachers(first_name, last_name, email, class, subject) VALUES(?,?,?,?,?)`)
-	stmt, err := db.Prepare(generateInsertQuery(models.Teacher{}))
+	stmt, err := db.Prepare(utils.GenerateInsertQuery("teachers", models.Teacher{}))
 	if err != nil {
 		return nil, utils.ErrorHandler(err, fmt.Sprintf("Database preparation failed: %v", err))
 	}
@@ -150,7 +89,7 @@ func AddTeachersDBHandler(newTeachers []models.Teacher) ([]models.Teacher, error
 
 	for i, teacher := range newTeachers {
 		// res, err := stmt.Exec(teacher.FirstName, teacher.LastName, teacher.Email, teacher.Class, teacher.Subject)
-		values := getStructValues(teacher)
+		values := utils.GetStructValues(teacher)
 		res, err := stmt.Exec(values...)
 		if err != nil {
 			return nil, utils.ErrorHandler(err, "Invalid request")
@@ -165,41 +104,6 @@ func AddTeachersDBHandler(newTeachers []models.Teacher) ([]models.Teacher, error
 	}
 	return addTeacers, err
 }
-
-func generateInsertQuery(model interface{}) string {
-	modelType := reflect.TypeOf(model)
-	var columns, placeholders string
-	for i := 0; i < modelType.NumField(); i++ {
-		dbTag := modelType.Field(i).Tag.Get("db")
-		fmt.Println(dbTag)
-		dbTag = strings.TrimSuffix(dbTag, ",omitempty")
-		if dbTag != "" && dbTag != "id" {
-			if columns != "" {
-				columns += ", "
-				placeholders += ", "
-			}
-			columns += dbTag
-			placeholders += "?"
-		}
-	}
-	return fmt.Sprintf("INSERT INTO teachers (%s) VALUES (%s)", columns, placeholders)
-}
-
-func getStructValues(model interface{}) []interface{} {
-	modelValue := reflect.ValueOf(model)
-	modelType := modelValue.Type()
-	values := []interface{}{}
-	for i := 0; i < modelType.NumField(); i++ {
-		dbTag := modelType.Field(i).Tag.Get("db")
-		if dbTag != "" && dbTag !=  "id,omitempty" {
-			values = append(values, modelValue.Field(i).Interface())
-		}
-		
-	}
-	log.Println("Values: ", values)
-	return values
-}
-
 
 func UpdateTeacherDBHandler(id int, updatedTeacher models.Teacher) (models.Teacher, error) {
 	db, err := ConnectDB()
@@ -303,7 +207,7 @@ func PatchTeacherDBHandler(id int, updates map[string]interface{}) (models.Teach
 func DeleteOneTeacher(w http.ResponseWriter, id int) (int64, error) {
 	db, err := ConnectDB()
 	if err != nil {
-		return 0, utils.ErrorHandler(err,  "Couldn't connect to db")
+		return 0, utils.ErrorHandler(err, "Couldn't connect to db")
 	}
 
 	defer db.Close()

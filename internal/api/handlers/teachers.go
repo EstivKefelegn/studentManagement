@@ -47,7 +47,7 @@ func GetTeacherHndler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	teacher, err := sqlconnect.GetTeacherById(id)
+	teacher, err := sqlconnect.GetStudentById(id)
 	if err != nil {
 		return
 	}
@@ -170,7 +170,7 @@ func PatchOneTeachersHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request payload", http.StatusInternalServerError)
 	}
 
-	updatedTeacher, err := sqlconnect.PatchTeacherDBHandler(id, updates)
+	updatedTeacher, err := sqlconnect.PatchStudentDBHandler(id, updates)
 	if err != nil {
 		log.Println(err)
 		return
@@ -302,7 +302,7 @@ func DeleteTeacherHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	affectedRow, err := sqlconnect.DeleteOneTeacher(w, id)
+	affectedRow, err := sqlconnect.DeleteOneStudent(w, id)
 	if err != nil {
 		return
 	}
@@ -330,7 +330,7 @@ func DeleteTeachersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	deletedIDs, err := sqlconnect.DeleteTeachers(ids)
+	deletedIDs, err := sqlconnect.DeleteStudents(ids)
 	if err != nil {
 		return
 	}

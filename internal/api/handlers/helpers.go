@@ -4,12 +4,11 @@ import (
 	"errors"
 	"reflect"
 	"strings"
-	"student_management_api/Golang/internal/models"
 	"student_management_api/Golang/pkg/utils"
 )
 
-func CheckEmptyFields(teacher models.Teacher) error {
-	val := reflect.ValueOf(teacher)
+func CheckEmptyFields(value interface{}) error {
+	val := reflect.ValueOf(value)
 	for i := 0; i < val.NumField(); i++ {
 		field := val.Field(i)
 		if field.Kind() == reflect.String && field.String() == "" {
