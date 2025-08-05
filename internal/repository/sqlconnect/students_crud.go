@@ -19,7 +19,7 @@ func GetStudentsDbHandler(students []models.Student, r *http.Request) ([]models.
 	}
 	defer db.Close()
 
-	query := `SELECT id, first_name, last_name, email, class, subject FROM students WHERE 1=1`
+	query := `SELECT id, first_name, last_name, email, class FROM students WHERE 1=1`
 	var args []interface{}
 
 	query, args = utils.AddFilter(r, query, args)
@@ -57,7 +57,7 @@ func GetStudentById(id int) (models.Student, error) {
 	defer db.Close()
 
 	var student models.Student
-	err = db.QueryRow(`SELECT id, first_name, last_name, email, class, subject FROM students WHERE id = ?`, id).Scan(
+	err = db.QueryRow(`SELECT id, first_name, last_name, email, class FROM students WHERE id = ?`, id).Scan(
 		&student.ID, &student.FirstName, &student.LastName, &student.Email, &student.Class)
 
 	if err == sql.ErrNoRows {
@@ -77,7 +77,7 @@ func AddStudentsDBHandler(newstudents []models.Student) ([]models.Student, error
 
 	defer db.Close()
 
-	// stmt, err := db.Prepare(`INSERT INTO students(first_name, last_name, email, class, subject) VALUES(?,?,?,?,?)`)
+	// stmt, err := db.Prepare(`INSERT INTO students(first_name, last_name, email, class) VALUES(?,?,?,?,?)`)
 	stmt, err := db.Prepare(utils.GenerateInsertQuery("students", models.Student{}))
 	if err != nil {
 		return nil, utils.ErrorHandler(err, fmt.Sprintf("Database preparation failed: %v", err))
@@ -116,7 +116,7 @@ func UpdateStudentDBHandler(id int, updatedstudent models.Student) (models.Stude
 	defer db.Close()
 
 	var existingstudents models.Student
-	row := db.QueryRow(`SELECT id, first_name, last_name, email, class, subject FROM students WHERE id = ?`, id)
+	row := db.QueryRow(`SELECT id, first_name, last_name, email, class FROM students WHERE id = ?`, id)
 
 	err = row.Scan(&existingstudents.ID, &existingstudents.FirstName, &existingstudents.LastName, &existingstudents.Email, &existingstudents.Class)
 
@@ -126,7 +126,7 @@ func UpdateStudentDBHandler(id int, updatedstudent models.Student) (models.Stude
 		return models.Student{}, utils.ErrorHandler(err, "Unable to retrive the data")
 	}
 	updatedstudent.ID = existingstudents.ID
-	res, err := db.Exec("UPDATE students SET first_name = ?, last_name = ?, email = ?, class = ?, subject = ? WHERE id = ?", updatedstudent.FirstName, updatedstudent.LastName, updatedstudent.Email, updatedstudent.Class, updatedstudent.ID)
+	res, err := db.Exec("UPDATE students SET first_name = ?, last_name = ?, email = ?, class = ? WHERE id = ?", updatedstudent.FirstName, updatedstudent.LastName, updatedstudent.Email, updatedstudent.Class, updatedstudent.ID)
 
 	if err != nil {
 		return models.Student{}, utils.ErrorHandler(err, "Uable to update the db")
@@ -148,7 +148,7 @@ func PatchStudentDBHandler(id int, updates map[string]interface{}) (models.Stude
 	defer db.Close()
 
 	var existingstudent models.Student
-	row := db.QueryRow(`SELECT id, first_name, last_name, email, class, subject FROM students WHERE id = ?`, id)
+	row := db.QueryRow(`SELECT id, first_name, last_name, email, class FROM students WHERE id = ?`, id)
 	err = row.Scan(&existingstudent.ID, &existingstudent.FirstName, &existingstudent.LastName, &existingstudent.Email, &existingstudent.Class)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -193,7 +193,7 @@ func PatchStudentDBHandler(id int, updates map[string]interface{}) (models.Stude
 	}
 	fmt.Println(studentVal.Type())
 
-	res, err := db.Exec(`UPDATE students SET first_name = ?, last_name = ?, email = ?, class = ?, subject = ? WHERE id = ?`, existingstudent.FirstName, existingstudent.LastName, existingstudent.Email, existingstudent.Class, existingstudent.ID)
+	res, err := db.Exec(`UPDATE students SET first_name = ?, last_name = ?, email = ?, class = ? = ? WHERE id = ?`, existingstudent.FirstName, existingstudent.LastName, existingstudent.Email, existingstudent.Class, existingstudent.ID)
 	if err != nil {
 		// http.Error(w, fmt.Sprintf("Couldn't update the reuested data: %v", err), http.StatusNotFound)
 		return models.Student{}, utils.ErrorHandler(err, "Couldn't update the reuested data")

@@ -25,7 +25,8 @@ func GetFieldNames(model interface{}) []string {
 
 	for i := 0; i < val.NumField(); i++ {
 		field := val.Field(i)
-		fieldToAdd := strings.TrimSuffix(field.Tag.Get("json"), ".omitepty")
+		// fieldToAdd := strings.TrimSuffix(field.Tag.Get("json"), ".omitempty")
+		fieldToAdd := strings.Split(field.Tag.Get("json"), ",")[0]
 		fields = append(fields, fieldToAdd)
 	}
 	return fields

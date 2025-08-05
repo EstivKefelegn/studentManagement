@@ -12,6 +12,7 @@ import (
 	"strings"
 	"student_management_api/Golang/internal/models"
 	"student_management_api/Golang/internal/repository/sqlconnect"
+	"student_management_api/Golang/pkg/utils"
 )
 
 func GetStudentsHndler(w http.ResponseWriter, r *http.Request) {
@@ -76,7 +77,6 @@ func AddStudentsHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(rawStudents)
 
 	fields := GetFieldNames(models.Student{})
-
 	allowedFields := make(map[string]struct{})
 	for _, field := range fields {
 		allowedFields[field] = struct{}{}
@@ -86,7 +86,8 @@ func AddStudentsHandler(w http.ResponseWriter, r *http.Request) {
 		for key := range Students {
 			_, ok := allowedFields[key]
 			if !ok {
-				http.Error(w, "Unacceptable field found in request. Only use allowed fields. ", http.StatusBadRequest)
+				// http.Error(w, "Unacceptable field found in request. Only use allowed fields. ", http.StatusBadRequest)
+				utils.ErrorHandler(err, "Unacceptable field found in request.")
 				return
 			}
 		}
@@ -140,7 +141,8 @@ func UpdateStudentHadler(w http.ResponseWriter, r *http.Request) {
 	var updatedStudent models.Student
 	err = json.NewDecoder(r.Body).Decode(&updatedStudent)
 	if err != nil {
-		http.Error(w, "Invalid Request Payload", http.StatusBadRequest)
+		// http.Error(w, "Invalid Request Payload", http.StatusBadRequest)
+		utils.ErrorHandler(err, "Invalid request payload")
 		return
 	}
 
@@ -219,7 +221,7 @@ func PatchStudentsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var StudentFormDB models.Student
-		err = db.QueryRow("SELECT id, first_name, last_name, email, class, subject FROM Students WHERE id = ?", id).Scan(&StudentFormDB.ID,
+		err = db.QueryRow("SELECT id, first_name, last_name, email, class FROM Students WHERE id = ?", id).Scan(&StudentFormDB.ID,
 			&StudentFormDB.FirstName, &StudentFormDB.LastName, &StudentFormDB.Email, &StudentFormDB.Class)
 
 		if err != nil {
@@ -265,7 +267,7 @@ func PatchStudentsHandler(w http.ResponseWriter, r *http.Request) {
 			StudentFormDB.FirstName, StudentFormDB.LastName,
 			StudentFormDB.Email, StudentFormDB.Class)
 
-		res, err := tx.Exec("UPDATE Students SET first_name = ?, last_name = ?, email = ?, class = ?, subject = ? WHERE id = ? ", StudentFormDB.FirstName,
+		res, err := tx.Exec("UPDATE Students SET first_name = ?, last_name = ?, email = ?, class = ? = ? WHERE id = ? ", StudentFormDB.FirstName,
 			StudentFormDB.LastName, StudentFormDB.Email, StudentFormDB.Class, StudentFormDB.ID)
 
 		if err != nil {
@@ -294,11 +296,12 @@ func PatchStudentsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteStudentHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/Students/")
+	idStr := strings.TrimPrefix(r.URL.Path, "/students/")
 	id, err := strconv.Atoi(idStr)
 
 	if err != nil {
-		http.Error(w, "Request not found", http.StatusBadRequest)
+		// http.Error(w, "Request not found", http.StatusBadRequest)
+		utils.ErrorHandler(err, "BadRequest")
 		return
 	}
 
