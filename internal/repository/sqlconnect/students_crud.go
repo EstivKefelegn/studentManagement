@@ -57,7 +57,7 @@ func GetStudentById(id int) (models.Student, error) {
 	defer db.Close()
 
 	var student models.Student
-	err = db.QueryRow(`SELECT id, first_name, last_name, email, class FROM students WHERE id = ?`, id).Scan(
+	err = db.QueryRow(`SELECT id, first_name, last_name, email, class FROM teachers WHERE id = ?`, id).Scan(
 		&student.ID, &student.FirstName, &student.LastName, &student.Email, &student.Class)
 
 	if err == sql.ErrNoRows {
@@ -236,7 +236,8 @@ func DeleteStudents(ids []int) ([]int, error) {
 
 	tx, err := db.Begin()
 	if err != nil {
-		log.Println("Invlid transaction")
+		// log.Println("Invlid transaction")
+		utils.ErrorHandler(err, "Invalid Transaction")
 		return nil, utils.ErrorHandler(err, "Invalid transaction")
 	}
 

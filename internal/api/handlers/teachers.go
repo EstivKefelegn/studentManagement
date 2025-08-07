@@ -12,6 +12,7 @@ import (
 	"strings"
 	"student_management_api/Golang/internal/models"
 	"student_management_api/Golang/internal/repository/sqlconnect"
+	"student_management_api/Golang/pkg/utils"
 )
 
 func GetTeachersHndler(w http.ResponseWriter, r *http.Request) {
@@ -47,7 +48,7 @@ func GetTeacherHndler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	teacher, err := sqlconnect.GetStudentById(id)
+	teacher, err := sqlconnect.GetTeacherById(id)
 	if err != nil {
 		return
 	}
@@ -332,6 +333,7 @@ func DeleteTeachersHandler(w http.ResponseWriter, r *http.Request) {
 
 	deletedIDs, err := sqlconnect.DeleteStudents(ids)
 	if err != nil {
+		utils.ErrorHandler(err, "Can't delete a teacher")
 		return
 	}
 
@@ -346,6 +348,58 @@ func DeleteTeachersHandler(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(response)
 
+}
+
+func GetStudentsByTeacherID(w http.ResponseWriter, r *http.Request) {
+	teacherID := r.PathValue("id")
+	var students []models.Student
+
+	db, err := sqlconnect.ConnectDB()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	defer db.Close()
+
+	students, err = sqlconnect.GetStudentsByTeacherIDFromDB(teacherID, students)
+	if err != nil {
+		return
+	}
+
+	response := struct {
+		Status string           `json:"status"`
+		Count  int              `json:"count"`
+		Data   []models.Student `json:"data"`
+	}{
+		Status: "Success",
+		Count:  len(students),
+		Data:   students,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+
+}
+
+func GetStudentCountByTeacherID(w http.ResponseWriter, r *http.Request) {
+	teacherID := r.PathValue("id")
+	count, err := sqlconnect.GetStudentCountByTeachersIDFromDB(teacherID)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	response := struct {
+		Status string `json:"status"`
+		Count  int    `json:"count"`
+	}{
+		Status: "success",
+		Count: count,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 func TeachersHandler(w http.ResponseWriter, r *http.Request) {
