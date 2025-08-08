@@ -93,6 +93,7 @@ func AddExecsHandler(w http.ResponseWriter, r *http.Request) {
 		err = CheckEmptyFields(exces)
 		if err != nil {
 			http.Error(w, "The is empty fiedls", http.StatusBadRequest)
+			utils.ErrorHandler(err, "There is empty fields")
 			return
 		}
 	}
