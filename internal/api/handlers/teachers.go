@@ -171,7 +171,7 @@ func PatchOneTeachersHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request payload", http.StatusInternalServerError)
 	}
 
-	updatedTeacher, err := sqlconnect.PatchStudentDBHandler(id, updates)
+	updatedTeacher, err := sqlconnect.PatchOneStudentDBHandler(id, updates)
 	if err != nil {
 		log.Println(err)
 		return
@@ -395,7 +395,7 @@ func GetStudentCountByTeacherID(w http.ResponseWriter, r *http.Request) {
 		Count  int    `json:"count"`
 	}{
 		Status: "success",
-		Count: count,
+		Count:  count,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

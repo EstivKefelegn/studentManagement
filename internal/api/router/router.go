@@ -9,6 +9,7 @@ func MainRouter() *http.ServeMux {
 	tRouter := TeachersRouter()
 	sRouter := StudentRouter()
 
+	sRouter.Handle("/", ExcecRouter())
 	tRouter.Handle("/", sRouter)
 	return tRouter	
 	// mux := http.NewServeMux()

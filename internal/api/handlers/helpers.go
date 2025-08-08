@@ -19,6 +19,7 @@ func CheckEmptyFields(value interface{}) error {
 	return nil
 }
 
+// Returns only the field names without the ommitempty tag
 func GetFieldNames(model interface{}) []string {
 	val := reflect.TypeOf(model)
 	fields := []string{}

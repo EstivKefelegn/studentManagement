@@ -59,8 +59,8 @@ func GetStudentHndler(w http.ResponseWriter, r *http.Request) {
 
 func AddStudentsHandler(w http.ResponseWriter, r *http.Request) {
 
-	var newStudents []models.Student
-	var rawStudents []map[string]interface{}
+	var newStudents []models.Student         // Will hold properly formatted student data
+	var rawStudents []map[string]interface{} //
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -172,7 +172,7 @@ func PatchOneStudentsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request payload", http.StatusInternalServerError)
 	}
 
-	updatedStudent, err := sqlconnect.PatchStudentDBHandler(id, updates)
+	updatedStudent, err := sqlconnect.PatchOneStudentDBHandler(id, updates)
 	if err != nil {
 		log.Println(err)
 		return

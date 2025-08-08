@@ -138,7 +138,7 @@ func UpdateStudentDBHandler(id int, updatedstudent models.Student) (models.Stude
 
 }
 
-func PatchStudentDBHandler(id int, updates map[string]interface{}) (models.Student, error) {
+func PatchOneStudentDBHandler(id int, updates map[string]interface{}) (models.Student, error) {
 
 	db, err := ConnectDB()
 	if err != nil {
