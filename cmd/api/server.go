@@ -44,7 +44,10 @@ func main() {
 	// }
 
 	// secureMux := utils.ApplyingMiddleware(router.Router(), mw.Hpp(hppOptions), mw.Compression, mw.SecurityHeader, mw.ResponseTimeMiddleware, rl.Middleware, mw.Cors)
-	secureMux := mw.SecurityHeader(router.MainRouter())
+	jwtMIddleware := mw.MiddlewaresExcludePaths(mw.JWTMiddleware, "/execs/login")
+	secureMux := jwtMIddleware(mw.SecurityHeader(router.MainRouter()))
+
+	// secureMux := mw.SecurityHeader(router.MainRouter())
 	fmt.Println("Server is going to start")
 	server := &http.Server{
 		Addr:      port,
