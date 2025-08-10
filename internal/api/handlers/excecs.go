@@ -11,7 +11,30 @@ import (
 	"student_management_api/Golang/internal/models"
 	"student_management_api/Golang/internal/repository/sqlconnect"
 	"student_management_api/Golang/pkg/utils"
+	"time"
 )
+
+func ExcecsHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		w.Write([]byte("Hello get request from excecs  page"))
+	case http.MethodPost:
+		err := r.ParseForm()
+		if err != nil {
+			fmt.Printf("Something went wrong %v", err)
+			return
+		}
+		fmt.Println("Form from POST methods =========> ", r.Form)
+		w.Write([]byte("Hello post request from excecs  page"))
+		fmt.Println("Hello post request from excecs  page")
+	case http.MethodPut:
+		w.Write([]byte("Hello put request from excecs  page"))
+		fmt.Println("Hello put request from excecs  page")
+	case http.MethodDelete:
+		w.Write([]byte("Hello delete request from excecs  page"))
+		fmt.Println("Hello delete requets from excecs  page")
+	}
+}
 
 func GetExecsHndler(w http.ResponseWriter, r *http.Request) {
 	var Execs []models.Exec
@@ -245,30 +268,129 @@ func DeleteExecsHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func ExcecsHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		w.Write([]byte("Hello get request from excecs  page"))
-		fmt.Println("hello get request from excecs  page")
-	case http.MethodPost:
-
-		// fmt.Println("Query: ", r.URL.Query())
-		// fmt.Println("Name: ", r.URL.Query().Get("name"))
-		// fmt.Println("Name: ", r.URL.Query().Get("name"))
-
-		err := r.ParseForm()
-		if err != nil {
-			fmt.Printf("Something went wrong %v", err)
-			return
-		}
-		fmt.Println("Form from POST methods =========> ", r.Form)
-		w.Write([]byte("Hello post request from excecs  page"))
-		fmt.Println("Hello post request from excecs  page")
-	case http.MethodPut:
-		w.Write([]byte("Hello put request from excecs  page"))
-		fmt.Println("Hello put request from excecs  page")
-	case http.MethodDelete:
-		w.Write([]byte("Hello delete request from excecs  page"))
-		fmt.Println("Hello delete requets from excecs  page")
+func LoginExecHadler(w http.ResponseWriter, r *http.Request) {
+	var req models.Exec
+	// Data Validation
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
 	}
+
+	defer r.Body.Close()
+
+	if req.UserName == "" || req.Password == "" {
+		http.Error(w, "Username and password are required", http.StatusBadRequest)
+		return
+	}
+
+	// Search for the use if the user actually exists
+	err, user, shouldReturn := sqlconnect.GetUserByUsername(w, req)
+	if shouldReturn {
+		return
+	}
+	// is user active
+	if !user.InactiveStatus {
+		http.Error(w, "The user is not active", http.StatusForbidden)
+		utils.ErrorHandler(err, "Inactive user try to login")
+		return
+	}
+
+	err = utils.VerifyPassword(req.Password, user.Password)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusForbidden)
+		return
+	}
+	// Generate token
+	tokenstring, err := utils.SignToken(user.ID, user.UserName, user.Role)
+	if err != nil {
+		http.Error(w, "Couldn't create login for the current user", http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "Bearer",
+		Value:    tokenstring,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		Expires:  time.Now().Add(24 * time.Hour),
+	})
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "test",
+		Value:    "test string",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		Expires:  time.Now().Add(24 * time.Hour),
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	response := struct {
+		Token string `json:"token"`
+	}{
+		Token: tokenstring,
+	}
+
+	json.NewEncoder(w).Encode(response)
+
+	// send token as a response or as a cookie
+}
+
+func LogoutExecHandler(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "Bearer",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		Expires:  time.Unix(0, 0),
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{ 
+	message: logged out successfully 
+				}`))
+}
+
+func UpdatePasswordHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+	_ = id
+
+	var req models.UpdatePasswordModel
+	err = json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, "Invalid Request Body", http.StatusBadRequest)
+		return
+	}
+
+	r.Body.Close()
+
+	if req.CurrentPassword == "" || req.NewPassword == "" {
+		http.Error(w, "Please enter password", http.StatusBadRequest)
+		return
+	}
+
+	_, err = sqlconnect.UpdatePasswordFromDB(id, req.CurrentPassword, req.NewPassword)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "applocation/json")
+	reponse := struct {
+		Message string `json:"message"`
+	}{
+		Message: "Password updated",
+	}
+
+	json.NewEncoder(w).Encode(reponse)
+
 }

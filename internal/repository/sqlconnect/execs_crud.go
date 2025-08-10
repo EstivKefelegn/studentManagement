@@ -1,10 +1,7 @@
 package sqlconnect
 
 import (
-	"crypto/rand"
 	"database/sql"
-	"encoding/base64"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,8 +9,7 @@ import (
 	"strconv"
 	"student_management_api/Golang/internal/models"
 	"student_management_api/Golang/pkg/utils"
-
-	"golang.org/x/crypto/argon2"
+	"time"
 )
 
 func GetExecsDbHandler(exces []models.Exec, r *http.Request) ([]models.Exec, error) {
@@ -97,23 +93,10 @@ func AddExcecHandlerDB(newExces []models.Exec) ([]models.Exec, error) {
 	addExecs := make([]models.Exec, len(newExces))
 
 	for i, exec := range newExces {
-		if exec.Password == "" {
-			return nil, utils.ErrorHandler(errors.New("password is blank"), "please enter the password")
-		}
-		salt := make([]byte, 16)
-		_, err = rand.Read(salt)
-
+		exec.Password, err = utils.HashPassword(exec.Password)
 		if err != nil {
-			return nil, utils.ErrorHandler(errors.New("failed to generate salt"), "error adding data")
+			return nil, err
 		}
-
-		hash := argon2.IDKey([]byte(exec.Password), salt, 1, 64*1024, 4, 32)
-		saltBase64 := base64.StdEncoding.EncodeToString(salt)
-		hashBase64 := base64.StdEncoding.EncodeToString(hash)
-
-		encodedHash := fmt.Sprintf("%s.%s", saltBase64, hashBase64)
-		exec.Password = encodedHash
-		
 
 		values := utils.GetStructValues(exec)
 		res, err := stmt.Exec(values...)
@@ -405,4 +388,89 @@ func PatchExecs(updates []map[string]interface{}) error {
 		return utils.ErrorHandler(err, "error updating data")
 	}
 	return nil
+}
+
+func GetUserByUsername(w http.ResponseWriter, req models.Exec) (error, *models.Exec, bool) {
+	db, err := ConnectDB()
+	if err != nil {
+		utils.ErrorHandler(err, "Couldn't connect to the database")
+		http.Error(w, "Couldn't connect to the db", http.StatusInternalServerError)
+		return nil, nil, true
+	}
+
+	defer db.Close()
+
+	user := &models.Exec{}
+	err = db.QueryRow(`SELECT id, first_name, last_name, email, username, password, inactive_status, role FROM execs WHERE username = ?`, req.UserName).Scan(
+		&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.UserName, &user.Password, &user.InactiveStatus, &user.Role,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			utils.ErrorHandler(err, "user not found")
+			http.Error(w, "user not found", http.StatusBadRequest)
+			return nil, nil, true
+		}
+		http.Error(w, "database query error", http.StatusInternalServerError)
+		return nil, nil, true
+
+	}
+	return err, user, false
+}
+
+func UpdatePasswordFromDB(id int, currentPassword string, newPassword string) (bool, error) {
+	db, err := ConnectDB()
+	if err != nil {
+		utils.ErrorHandler(err, "couldn't connect to the db")
+		return false, err
+	}
+
+	defer db.Close()
+
+	var username string
+	var userPassword string
+	var userRole string
+	err = db.QueryRow(`SELECT username, password, role FROM execs WHERE id = ?`, id).Scan(&username, &userPassword, &userRole)
+	if err != nil {
+		utils.ErrorHandler(err, "User not found")
+		return false, err
+	}
+
+	err = utils.VerifyPassword(currentPassword, userPassword)
+	if err != nil {
+		utils.ErrorHandler(err, "The password you entered doesn't match the current password on file")
+		return false, err
+	}
+
+	hashedPassword, err := utils.HashPassword(newPassword)
+	if err != nil {
+		utils.ErrorHandler(err, "internal error")
+		return false, err
+	}
+
+	currentTime := time.Now().Format(time.RFC3339)
+	_, err = db.Exec("UPDATE execs SET password = ?, password_changed_at = ? WHERE id = ?", hashedPassword, currentTime, id)
+	if err != nil {
+		utils.ErrorHandler(err, "password update failed")
+		return false, err
+	}
+
+	// If we want to generate a new token to update password we can uncomment
+	// token, err := utils.SignToken(id, username, userRole)
+	// if err != nil {
+	// 	utils.ErrorHandler(err, "Upassword update couldn't create the token")
+	// 	return false, err
+	// }
+
+	// http.SetCookie(w, &http.Cookie{
+	// 	Name:     "Bearer",
+	// 	Value:    token,
+	// 	Path:     "/",
+	// 	HttpOnly: true,
+	// 	Secure:   true,
+	// 	Expires:  time.Now().Add(24 * time.Minute),
+	// 	SameSite: http.SameSiteStrictMode,
+	// })
+
+	return true, nil
 }

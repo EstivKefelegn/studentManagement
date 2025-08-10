@@ -16,3 +16,15 @@ type Exec struct {
 	InactiveStatus      bool           `json:"inactive_status,omitempty" db:"inactive_status,omitempty"`
 	Role                string         `json:"role,omitempty" db:"role,omitempty"`
 }
+
+type UpdatePasswordModel struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+type UpdatedPasswordResponse struct {
+	Token           string `json:"token"`
+	PasswordUpdated string `json:"password_updated"`
+}
+
+
