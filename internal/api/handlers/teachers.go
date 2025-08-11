@@ -351,6 +351,12 @@ func DeleteTeachersHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetStudentsByTeacherID(w http.ResponseWriter, r *http.Request) {
+	// This route is accessed by admin, manager and exec
+	_, err := utils.AuthorizeUser(r.Context().Value(utils.ContextKey("role")).(string), "admin", "manager", "exec")
+	if err != nil{
+		http.Error(w, err.Error(), http.StatusInternalServerError)	
+		return
+	}
 	teacherID := r.PathValue("id")
 	var students []models.Student
 
