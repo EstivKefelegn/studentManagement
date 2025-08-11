@@ -44,7 +44,7 @@ func main() {
 	// }
 
 	// secureMux := utils.ApplyingMiddleware(router.Router(), mw.Hpp(hppOptions), mw.Compression, mw.SecurityHeader, mw.ResponseTimeMiddleware, rl.Middleware, mw.Cors)
-	jwtMIddleware := mw.MiddlewaresExcludePaths(mw.JWTMiddleware, "/execs/login")
+	jwtMIddleware := mw.MiddlewaresExcludePaths(mw.JWTMiddleware, "/execs/login",  "/execs/forgotpassword", "/execs/resetpassword/reset")
 	secureMux := jwtMIddleware(mw.SecurityHeader(router.MainRouter()))
 
 	// secureMux := mw.SecurityHeader(router.MainRouter())

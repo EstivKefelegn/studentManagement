@@ -10,12 +10,12 @@ import (
 	"student_management_api/Golang/pkg/utils"
 )
 
-func GetStudentsDbHandler(students []models.Student, r *http.Request) ([]models.Student, error) {
+func GetStudentsDbHandler(students []models.Student, r *http.Request, page, limit int) ([]models.Student, int, error) {
 	db, err := ConnectDB()
 
 	if err != nil {
 		// http.Error(w, , http.StatusBadRequest)
-		return nil, utils.ErrorHandler(err, fmt.Sprintf("Couldn't connect to db: %v", err))
+		return nil, 0, utils.ErrorHandler(err, fmt.Sprintf("Couldn't connect to db: %v", err))
 	}
 	defer db.Close()
 
@@ -23,6 +23,12 @@ func GetStudentsDbHandler(students []models.Student, r *http.Request) ([]models.
 	var args []interface{}
 
 	query, args = utils.AddFilter(r, query, args)
+	
+	//Add Pagination formula to add pagination is (page - 1) * limit
+	offset := (page - 1) * limit
+	query += " LIMIT ? OFFSET ?" 
+
+	args = append(args, limit, offset)
 
 	query = utils.AddSorting(r, query)
 
@@ -31,7 +37,7 @@ func GetStudentsDbHandler(students []models.Student, r *http.Request) ([]models.
 	if err != nil {
 		fmt.Println(err)
 		// http.Error(w, "Databse Query Error", http.StatusInternalServerError)
-		return nil, utils.ErrorHandler(err, "Databse Query Error")
+		return nil,  0, utils.ErrorHandler(err, "Databse Query Error")
 	}
 	defer rows.Close()
 
@@ -41,12 +47,21 @@ func GetStudentsDbHandler(students []models.Student, r *http.Request) ([]models.
 		var student models.Student
 		err = rows.Scan(&student.ID, &student.FirstName, &student.LastName, &student.Email, &student.Class)
 		if err != nil {
-			return nil, utils.ErrorHandler(err, "Error scanning databse results")
+			return nil, 0, utils.ErrorHandler(err, "Error scanning databse results")
 		}
 		studentsList = append(studentsList, student)
 		fmt.Println(studentsList)
 	}
-	return studentsList, nil
+
+	var totalStudents int
+	err = db.QueryRow("SELECT COUNT(*) FROM students").Scan(&totalStudents)
+	if err != nil {
+		utils.ErrorHandler(err, "")
+		totalStudents = 0
+	}
+
+
+	return studentsList, totalStudents, nil
 }
 
 func GetStudentById(id int) (models.Student, error) {

@@ -1,15 +1,21 @@
 package sqlconnect
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"reflect"
 	"strconv"
 	"student_management_api/Golang/internal/models"
 	"student_management_api/Golang/pkg/utils"
 	"time"
+
+	"github.com/go-mail/mail/v2"
 )
 
 func GetExecsDbHandler(exces []models.Exec, r *http.Request) ([]models.Exec, error) {
@@ -473,4 +479,105 @@ func UpdatePasswordFromDB(id int, currentPassword string, newPassword string) (b
 	// })
 
 	return true, nil
+}
+
+func ForgotPasswordDBHandler(emailID string) error {
+	db, err := ConnectDB()
+	if err != nil {
+		return utils.ErrorHandler(err, "Couldn't connect to the database")
+	}
+
+	defer db.Close()
+
+	var exec models.Exec
+	err = db.QueryRow(`SELECT id FROM execs WHERE email = ?`, emailID).Scan(&exec.ID)
+	if err != nil {
+		return utils.ErrorHandler(err, "User not found")
+
+	}
+
+	duration, err := strconv.Atoi(os.Getenv("RESET_TOKEN_EXP_DURATION"))
+	if err != nil {
+		return utils.ErrorHandler(err, "Failed to send password reset mail")
+	}
+
+	mins := time.Duration(duration)
+	expiryDate := time.Now().Add(mins * time.Minute).Format(time.RFC3339)
+	tokenByte := make([]byte, 32)
+
+	_, err = rand.Read(tokenByte)
+	if err != nil {
+		return utils.ErrorHandler(err, "Failed to send password reset mail")
+	}
+
+	log.Println("tokenBytes: ", tokenByte)
+	token := hex.EncodeToString(tokenByte)
+	log.Println("token: ", token)
+
+	hashedToken := sha256.Sum256(tokenByte)
+	log.Println("Hashed Token", hashedToken)
+
+	hashedTokenString := hex.EncodeToString(hashedToken[:])
+	fmt.Println("Token hash string: ", hashedTokenString)
+	_, err = db.Exec("UPDATE execs SET password_reset_token = ?, password_token_expires = ? WHERE id = ?", hashedTokenString, expiryDate, exec.ID)
+	if err != nil {
+		return utils.ErrorHandler(err, "Failed to send password reset mail")
+	}
+
+	resetURL := fmt.Sprintf("https://localhost:3000/execs/resetpassword/reset/%s", token)
+	message := fmt.Sprintf("Foregot your password? Reset your password using the following link: \n%s\nIf you didn't request a password	reset, please ingnor this email. This link is only valid for %d minutes", resetURL, int(mins))
+
+	m := mail.NewMessage()
+	m.SetHeader("From", "Estifanoakefelegn1991@gmail.com")
+	m.SetHeader("To", emailID)
+	m.SetHeader("Subject", "Your password reset link")
+	m.SetBody("text/plain", message)
+
+	d := mail.NewDialer("localhost", 1025, "", "")
+	err = d.DialAndSend(m)
+	if err != nil {
+		return utils.ErrorHandler(err, "Failed to send password reset mail")
+	}
+	return nil
+}
+
+func ResetPasswordDBHandler(token string, newPassword string) error {
+	bytes, err := hex.DecodeString(token)
+	if err != nil {
+		return utils.ErrorHandler(err, "internal error")
+		
+	}
+
+	hashToken := sha256.Sum256(bytes)
+	hashedTokenString := hex.EncodeToString(hashToken[:])
+
+	db, err := ConnectDB()
+	if err != nil {
+		// http.Error(w, "Couldn't connect to the db", http.StatusInternalServerError)
+		return utils.ErrorHandler(err, "internal error")
+		
+	}	
+
+	defer db.Close()
+
+	var user models.Exec
+
+	query := "SELECT id, email FROM execs WHERE password_reset_token = ? AND password_token_expires > ?"
+	err = db.QueryRow(query, hashedTokenString, time.Now().Format(time.RFC3339)).Scan(&user.ID, &user.Email)
+	if err != nil {
+		return utils.ErrorHandler(err, "invalid or expired reset code")
+	}
+
+	hashedPassword, err := utils.HashPassword(newPassword)
+	if err != nil {
+		return	utils.ErrorHandler(err, "internal error")
+	}
+
+	updateQuery := "UPDATE execs SET password  = ?, password_reset_token = NULL, password_token_expires = NULL, password_changed_at = ? WHERE id = ?"
+	_, err = db.Exec(updateQuery, hashedPassword, time.Now().Format(time.RFC3339), user.ID)
+
+	if err != nil {
+		return utils.ErrorHandler(err, "Internal error")
+	}
+	return nil
 }

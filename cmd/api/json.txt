@@ -1,0 +1,47 @@
+[
+  {
+    "id": 1,
+    "first_name": "Alice",
+    "last_name": "Johnson",
+    "email": "alice.johnson@example.com",
+    "username": "alicej",
+    "password": "hashed_password_123",
+    "role": "admin"
+  },
+  {
+    "id": 2,
+    "first_name": "Bob",
+    "last_name": "Smith",
+    "email": "bob.smith@example.com",
+    "username": "bobsmith",
+    "password": "hashed_password_456",
+    "role": "manager"
+  },
+  {
+    "id": 3,
+    "first_name": "Charlie",
+    "last_name": "Davis",
+    "email": "charlie.davis@example.com",
+    "username": "charlied",
+    "password": "hashed_password_789",
+    "role": "user"
+  },
+  {
+    "id": 4,
+    "first_name": "Diana",
+    "last_name": "Lopez",
+    "email": "diana.lopez@example.com",
+    "username": "dlopez",
+    "password": "hashed_password_abc",
+    "role": "supervisor"
+  },
+  {
+    "id": 5,
+    "first_name": "Ethan",
+    "last_name": "Wright",
+    "email": "ethan.wright@example.com",
+    "username": "ethanw",
+    "password": "hashed_password_def",
+    "role": "admin"
+  }
+]
