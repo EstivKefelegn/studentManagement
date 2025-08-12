@@ -19,6 +19,7 @@ import (
 func XSSMiddleware(next http.Handler) http.Handler {
 	fmt.Println("************ Initializing XSSMiddleware")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Println("************ Initializing Starts")
 
 		// Sanotize the url path
 		sanitizePath, err := clean(r.URL.Path)
@@ -75,10 +76,11 @@ func XSSMiddleware(next http.Handler) http.Handler {
 
 				if len(bodyString) > 0 {
 					var inputData interface{}
-					err := json.NewDecoder(bytes.NewReader([]byte(bodyString))).Decode(inputData)
+					err := json.NewDecoder(bytes.NewReader([]byte(bodyString))).Decode(&inputData)
 
 					if err != nil {
 						http.Error(w, "Invalid JSON body=-=-=", http.StatusBadRequest)
+						utils.ErrorHandler(err, "Invalid json")
 						return
 					}
 
